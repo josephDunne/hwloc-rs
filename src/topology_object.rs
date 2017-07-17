@@ -254,6 +254,24 @@ impl TopologyObject {
             unsafe { Some(&*cache_ptr) }
         }
     }
+
+    pub fn osdev_attributes(&self) -> Option<&TopologyObjectOSDevAttributes> {
+        let osdev_ptr = unsafe { (*self.attr).osdev() };
+        if osdev_ptr.is_null() {
+            None
+        } else {
+            unsafe { Some(&*osdev_ptr) }
+        }
+    }
+
+    pub fn pci_attributes(&self) -> Option<&TopologyObjectPCIDevAttributes> {
+        let pcidev_ptr = unsafe { (*self.attr).pcidev() };
+        if pcidev_ptr.is_null() {
+            None
+        } else {
+            unsafe { Some(&*pcidev_ptr) }
+        }
+    }
 }
 
 impl fmt::Display for TopologyObject {
@@ -415,18 +433,19 @@ pub struct TopologyObjectGroupAttributes {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub struct TopologyObjectPCIDevAttributes {
-    domain: c_ushort,
-    bus: c_uchar,
-    dev: c_uchar,
-    func: c_uchar,
-    class_id: c_ushort,
-    vendor_id: c_ushort,
-    device_id: c_ushort,
-    subvendor_id: c_ushort,
-    subdevice_id: c_ushort,
-    revision: c_uchar,
-    linkspeed: c_float,
+    pub domain: c_ushort,
+    pub bus: c_uchar,
+    pub dev: c_uchar,
+    pub func: c_uchar,
+    pub class_id: c_ushort,
+    pub vendor_id: c_ushort,
+    pub device_id: c_ushort,
+    pub subvendor_id: c_ushort,
+    pub subdevice_id: c_ushort,
+    pub revision: c_uchar,
+    pub linkspeed: c_float,
 }
 
 #[repr(C)]
@@ -446,10 +465,11 @@ pub enum TopologyObjectBridgeType {
 
 #[repr(C)]
 pub struct TopologyObjectOSDevAttributes {
-    _type: TopologyObjectOSDevType,
+    pub dev_type: TopologyObjectOSDevType,
 }
 
 #[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TopologyObjectOSDevType {
     Block = 0,
     GPU = 1,

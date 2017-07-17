@@ -5,7 +5,8 @@ use hwloc::{Topology, ObjectType};
 /// Compute the amount of cache that the first logical processor
 /// has above it.
 fn main() {
-    let topo = Topology::new();
+    let topo = Topology::new()
+        .expect("Failed to init topology");
 
     let pu = topo.objects_with_type(&ObjectType::PU).unwrap()[0];
 

@@ -10,7 +10,8 @@ use hwloc::{Topology, CPUBIND_PROCESS, TopologyObject, ObjectType};
 /// Example which binds an arbitrary process (in this example this very same one) to
 /// the last core.
 fn main() {
-    let mut topo = Topology::new();
+    let mut topo = Topology::new()
+        .expect("Failed to init topology");
 
     // load the current pid through libc
     let pid = get_pid();

@@ -4,7 +4,8 @@ use hwloc::Topology;
 
 /// Example on how to check for specific topology support of a feature.
 fn main() {
-    let topo = Topology::new();
+    let topo = Topology::new()
+        .expect("Failed to init topology");
 
     // Check if Process Binding for CPUs is supported
     println!("CPU Binding (current process) supported: {}",

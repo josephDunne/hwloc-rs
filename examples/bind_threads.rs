@@ -19,7 +19,8 @@ use std::sync::{Arc, Mutex};
 /// Thread 1: Before Some(0-1), After Some(1)
 /// ```
 fn main() {
-    let topo = Arc::new(Mutex::new(Topology::new()));
+    let topo = Arc::new(Mutex::new(Topology::new()
+                                       .expect("Failed to init topology")));
 
     // Grab the number of cores in a block so that the lock is removed once
     // the end of the block is reached.

@@ -4,7 +4,8 @@ use hwloc::{Topology, TopologyObject};
 
 /// Walk the topology in a tree-style and print it.
 fn main() {
-    let topo = Topology::new();
+    let topo = Topology::new()
+        .expect("Failed to init topology");
 
     println!("*** Printing overall tree");
     print_children(&topo, topo.object_at_root(), 0);

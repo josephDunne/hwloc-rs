@@ -188,6 +188,8 @@ extern "C" {
     pub fn hwloc_topology_set_flags(topology: *mut HwlocTopology, flags: c_ulonglong) -> c_int;
     pub fn hwloc_topology_get_flags(topology: *mut HwlocTopology) -> c_ulonglong;
     pub fn hwloc_topology_get_support(topology: *mut HwlocTopology) -> *const TopologySupport;
+    pub fn hwloc_topology_set_synthetic(topology: *mut HwlocTopology,
+                                        description: *const c_char) -> c_int;
 
     // === Object levels, depths and types ===
 
@@ -288,6 +290,17 @@ extern "C" {
                                    -> c_int;
 
     pub fn hwloc_compare_types(type1: ObjectType, type2: ObjectType) -> c_int;
+
+    // === Exporting ===
+    pub fn hwloc_topology_export_synthetic(topology: *mut HwlocTopology,
+                                           buffer: *mut c_char,
+                                           buflen: c_int,
+                                           flags: c_ulonglong) -> c_int;
+
+    // === Finding I/O Objects
+    pub fn hwloc_get_next_osdev(topology: *mut HwlocTopology,
+                                prev: *mut TopologyObject) -> *mut TopologyObject;
+
 
 }
 
@@ -306,6 +319,8 @@ extern "C" {
     pub fn hwloc_topology_set_flags(topology: *mut HwlocTopology, flags: c_ulonglong) -> c_int;
     pub fn hwloc_topology_get_flags(topology: *mut HwlocTopology) -> c_ulonglong;
     pub fn hwloc_topology_get_support(topology: *mut HwlocTopology) -> *const TopologySupport;
+    pub fn hwloc_topology_set_synthetic(topology: *mut HwlocTopology,
+                                        description: *const c_char) -> c_int;
 
     // === Object levels, depths and types ===
 
@@ -406,6 +421,12 @@ extern "C" {
                                    -> c_int;
 
     pub fn hwloc_compare_types(type1: ObjectType, type2: ObjectType) -> c_int;
+
+    // === Exporting ===
+    pub fn hwloc_topology_export_synthetic(topology: *mut HwlocTopology,
+                                           buffer: *mut c_char,
+                                           buflen: c_int,
+                                           flags: c_ulonglong) -> c_int;
 }
 
 #[cfg(test)]

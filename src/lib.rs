@@ -27,7 +27,7 @@
 //! use hwloc::Topology;
 //!
 //! fn main() {
-//! 	let topo = Topology::new();
+//! 	let topo = Topology::new().unwrap();
 //!
 //! 	for i in 0..topo.depth() {
 //! 		println!("*** Objects at level {}", i);
@@ -95,10 +95,12 @@ pub use ffi::{ObjectType, TypeDepthError, TopologyFlag};
 pub use bitmap::{Bitmap, CpuSet, NodeSet};
 pub use support::{TopologySupport, TopologyDiscoverySupport, TopologyCpuBindSupport,
                   TopologyMemBindSupport};
-pub use topology_object::{TopologyObject, TopologyObjectMemory};
+pub use topology_object::*;
+use std::fmt;
 
 use num::{ToPrimitive, FromPrimitive};
 use errno::errno;
+pub use errno::Errno;
 
 pub struct Topology {
     topo: *mut ffi::HwlocTopology,
@@ -134,25 +136,29 @@ impl Topology {
     /// ```
     /// use hwloc::Topology;
     ///
-    /// let topology = Topology::new();
+    /// let _topology = Topology::new().unwrap();
     /// ```
     ///
     /// Note that the topology implements the Drop trait, so when
     /// it goes out of scope no further cleanup is necessary.
-    pub fn new() -> Topology {
+    pub fn new() -> Result<Topology, Errno> {
         let mut topo: *mut ffi::HwlocTopology = std::ptr::null_mut();
 
         unsafe {
-            ffi::hwloc_topology_init(&mut topo);
-            ffi::hwloc_topology_load(topo);
+            if 0 != ffi::hwloc_topology_init(&mut topo) {
+                return Err(errno())
+            }
+            if 0 != ffi::hwloc_topology_load(topo) {
+                return Err(errno())
+            }
         }
 
         let support = unsafe { ffi::hwloc_topology_get_support(topo) };
 
-        Topology {
+        Ok(Topology {
             topo: topo,
             support: support,
-        }
+        })
     }
 
     /// Creates a new Topology with custom flags.
@@ -165,12 +171,12 @@ impl Topology {
     /// ```
     /// use hwloc::{Topology, TopologyFlag};
     ///
-    /// let topology = Topology::with_flags(vec![TopologyFlag::IoDevices]);
+    /// let _topology = Topology::with_flags(vec![TopologyFlag::IoDevices]);
     /// ```
     ///
     /// Note that the topology implements the Drop trait, so when
     /// it goes out of scope no further cleanup is necessary.
-    pub fn with_flags(flags: Vec<TopologyFlag>) -> Topology {
+    pub fn with_flags(flags: Vec<TopologyFlag>) -> Result<Topology, Errno> {
         let mut topo: *mut ffi::HwlocTopology = std::ptr::null_mut();
 
         let final_flag = flags
@@ -179,21 +185,49 @@ impl Topology {
             .fold(0, |out, current| out | current);
 
         unsafe {
-            ffi::hwloc_topology_init(&mut topo);
-            ffi::hwloc_topology_set_flags(topo, final_flag);
-            ffi::hwloc_topology_load(topo);
+            if 0 != ffi::hwloc_topology_init(&mut topo) {
+                return Err(errno())
+            }
+            if 0 !=  ffi::hwloc_topology_set_flags(topo, final_flag) {
+                return Err(errno())
+            }
+            if 0 != ffi::hwloc_topology_load(topo) {
+                return Err(errno())
+            }
         }
 
         let support = unsafe { ffi::hwloc_topology_get_support(topo) };
 
-        Topology {
+        Ok(Topology {
             topo: topo,
             support: support,
-        }
+        })
     }
 
     pub fn support(&self) -> &TopologySupport {
         unsafe { &*self.support }
+    }
+
+    pub fn set_synthetic(description: &str) -> Result<Topology, Errno> {
+        let mut topo: *mut ffi::HwlocTopology = std::ptr::null_mut();
+        let description = ::std::ffi::CString::new(description).unwrap();
+
+        unsafe {
+            if 0 != ffi::hwloc_topology_init(&mut topo) {
+                return Err(errno())
+            }
+            if 0 != ffi::hwloc_topology_set_synthetic(topo, description.into_raw()) {
+                return Err(errno())
+            }
+            if 0 != ffi::hwloc_topology_load(topo) {
+                return Err(errno())
+            }
+        }
+        let support = unsafe { ffi::hwloc_topology_get_support(topo) };
+        Ok(Topology {
+            topo: topo,
+            support: support,
+        })
     }
 
     /// Returns the flags currently set for this topology.
@@ -206,10 +240,10 @@ impl Topology {
     /// ```
     /// use hwloc::{Topology,TopologyFlag};
     ///
-    /// let default_topology = Topology::new();
+    /// let default_topology = Topology::new().unwrap();
     /// assert_eq!(0, default_topology.flags().len());
     ///
-    /// let topology_with_flags = Topology::with_flags(vec![TopologyFlag::IoDevices]);
+    /// let topology_with_flags = Topology::with_flags(vec![TopologyFlag::IoDevices]).unwrap();
     /// assert_eq!(vec![TopologyFlag::IoDevices], topology_with_flags.flags());
     /// ```
     pub fn flags(&self) -> Vec<TopologyFlag> {
@@ -235,7 +269,7 @@ impl Topology {
     /// ```
     /// use hwloc::Topology;
     ///
-    /// let topology = Topology::new();
+    /// let topology = Topology::new().unwrap();
     /// assert!(topology.depth() > 0);
     /// ```
     pub fn depth(&self) -> u32 {
@@ -249,7 +283,7 @@ impl Topology {
     /// ```
     /// use hwloc::{Topology,ObjectType};
     ///
-    /// let topology = Topology::new();
+    /// let topology = Topology::new().unwrap();
     ///
     /// let machine_depth = topology.depth_for_type(&ObjectType::Machine).unwrap();
     /// let pu_depth = topology.depth_for_type(&ObjectType::PU).unwrap();
@@ -319,7 +353,7 @@ impl Topology {
     /// ```
     /// use hwloc::{Topology,ObjectType};
     ///
-    /// let topology = Topology::new();
+    /// let topology = Topology::new().unwrap();
     ///
     /// // Load depth for PU to assert against
     /// let pu_depth = topology.depth_for_type(&ObjectType::PU).unwrap();
@@ -333,9 +367,9 @@ impl Topology {
     /// minus one. It can't be negative since its an unsigned integer, but be
     /// careful with the depth provided in general.
     pub fn type_at_depth(&self, depth: u32) -> ObjectType {
-        if depth > self.depth() - 1 {
-            panic!("The provided depth {} is out of bounds.", depth);
-        }
+//        if depth > self.depth() - 1 {
+//            panic!("The provided depth {} is out of bounds.", depth);
+//        }
 
         unsafe { ffi::hwloc_get_depth_type(self.topo, depth) }
     }
@@ -347,7 +381,7 @@ impl Topology {
     /// ```
     /// use hwloc::Topology;
     ///
-    /// let topology = Topology::new();
+    /// let topology = Topology::new().unwrap();
     ///
     /// let topo_depth = topology.depth();
     /// assert!(topology.size_at_depth(topo_depth - 1) > 0);
@@ -359,9 +393,9 @@ impl Topology {
     /// minus one. It can't be negative since its an unsigned integer, but be
     /// careful with the depth provided in general.
     pub fn size_at_depth(&self, depth: u32) -> u32 {
-        if depth > self.depth() - 1 {
-            panic!("The provided depth {} is out of bounds.", depth);
-        }
+//        if depth > self.depth() - 1 {
+//            panic!("The provided depth {} is out of bounds.", depth);
+//        }
 
         unsafe { ffi::hwloc_get_nbobjs_by_depth(self.topo, depth) }
     }
@@ -371,9 +405,9 @@ impl Topology {
     /// # Examples
     ///
     /// ```
-    /// use hwloc::{Topology,TopologyObject};
+    /// use hwloc::Topology;
     ///
-    /// let topology = Topology::new();
+    /// let topology = Topology::new().unwrap();
     ///
     /// assert_eq!(topology.type_at_root(), topology.object_at_root().object_type());
     /// ```
@@ -388,9 +422,9 @@ impl Topology {
     /// # Examples
     ///
     /// ```
-    /// use hwloc::{Topology,ObjectType};
+    /// use hwloc::Topology;
     ///
-    /// let topology = Topology::new();
+    /// let topology = Topology::new().unwrap();
     ///
     /// let root_type = topology.type_at_root();
     /// let depth_type = topology.type_at_depth(0);
@@ -591,6 +625,29 @@ impl Topology {
             _ => None
         }
     }
+
+    /// Export the topology as a synthetic string.
+    pub fn export_synthetic(&self) -> Result<String, Errno> {
+        let cstr = ::std::ffi::CString::new(String::with_capacity(1024)).expect("Error: ");
+        unsafe {
+            let ptr = cstr.into_raw();
+            if ffi::hwloc_topology_export_synthetic(self.topo, ptr, 1024, 3) < 0 {
+                return Err(errno())
+            }
+            let description = ::std::ffi::CString::from_raw(ptr).into_string().expect("Error: ");
+            Ok(description)
+        }
+    }
+}
+
+impl fmt::Debug for Topology {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Ok(description) = self.export_synthetic() {
+            write!(f, "Topology: {}", description)
+        } else {
+            write!(f, "Topology {{}}")
+        }
+    }
 }
 
 impl Drop for Topology {
@@ -599,11 +656,6 @@ impl Drop for Topology {
     }
 }
 
-impl Default for Topology {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 #[derive(Debug)]
 pub enum CpuBindError {
@@ -681,20 +733,23 @@ mod tests {
 
     #[test]
     fn should_set_and_get_flags() {
-        let topo = Topology::with_flags(vec![TopologyFlag::WholeSystem, TopologyFlag::IoBridges]);
+        let topo = Topology::with_flags(vec![TopologyFlag::WholeSystem, TopologyFlag::IoBridges])
+                        .expect("Failed to init topology");
         assert_eq!(vec![TopologyFlag::WholeSystem, TopologyFlag::IoBridges],
                    topo.flags());
     }
 
     #[test]
     fn should_get_topology_depth() {
-        let topo = Topology::new();
+        let topo = Topology::new()
+            .expect("Failed to init topology");
         assert!(topo.depth() > 0);
     }
 
     #[test]
     fn should_match_types_and_their_depth() {
-        let topo = Topology::new();
+        let topo = Topology::new()
+            .expect("Failed to init topology");
 
         let pu_depth = topo.depth_for_type(&ObjectType::PU).ok().unwrap();
         assert!(pu_depth > 0);
@@ -703,13 +758,15 @@ mod tests {
 
     #[test]
     fn should_get_nbobjs_by_depth() {
-        let topo = Topology::new();
+        let topo = Topology::new()
+            .expect("Failed to init topology");
         assert!(topo.size_at_depth(1) > 0);
     }
 
     #[test]
     fn should_get_root_object() {
-        let topo = Topology::new();
+        let topo = Topology::new()
+            .expect("Failed to init topology");
 
         let root_obj = topo.object_at_root();
         assert_eq!(ObjectType::Machine, root_obj.object_type());
@@ -723,7 +780,8 @@ mod tests {
     #[test]
     #[cfg(target_os="linux")]
     fn should_support_cpu_binding_on_linux() {
-        let topo = Topology::new();
+        let topo = Topology::new()
+            .expect("Failed to init topology");
 
         assert!(topo.support().cpu().set_current_process());
         assert!(topo.support().cpu().set_current_thread());
@@ -732,7 +790,8 @@ mod tests {
     #[test]
     #[cfg(target_os="freebsd")]
     fn should_support_cpu_binding_on_freebsd() {
-        let topo = Topology::new();
+        let topo = Topology::new()
+            .expect("Failed to init topology");
 
         assert!(topo.support().cpu().set_current_process());
         assert!(topo.support().cpu().set_current_thread());
@@ -741,7 +800,8 @@ mod tests {
     #[test]
     #[cfg(target_os="macos")]
     fn should_not_support_cpu_binding_on_macos() {
-        let topo = Topology::new();
+        let topo = Topology::new()
+            .expect("Failed to init topology");
 
         assert_eq!(false, topo.support().cpu().set_current_process());
         assert_eq!(false, topo.support().cpu().set_current_thread());
@@ -757,13 +817,22 @@ mod tests {
     }
 
     #[test]
-    fn should_find_objetcs_by_cputset() {
-        let topo = Topology::new();
+    fn should_find_objects_by_cputset() {
+        let topo = Topology::set_synthetic("nodes:2 pack:3 l2:4 cores:5 6")
+            .expect("Failed to create test topology");
         let root_obj = topo.object_at_root();
         let root_cpuset = root_obj.cpuset().expect("No cpuset");
 
         let _pu = topo.get_obj_inside_cpuset_by_type(&ObjectType::PU, root_cpuset, 0)
                      .expect("Failed to find PU object in root cpu_set");
+    }
+
+    #[test]
+    fn should_export_syntehtic() {
+        let topo = Topology::set_synthetic("nodes:2 pack:3 l2:4 cores:5 6")
+            .expect("Failed to create test topology");
+        let description = topo.export_synthetic().expect("Error: ");
+        assert_eq!(description, "NUMANode:2 Package:3 Cache:4 Core:5 PU:6");
     }
 
 }

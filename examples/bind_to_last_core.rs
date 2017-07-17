@@ -17,7 +17,8 @@ use hwloc::{Topology, TopologyObject, ObjectType, CPUBIND_PROCESS};
 /// Cpu Location after explicit bind: Some(1)
 /// ```
 fn main() {
-    let mut topo = Topology::new();
+    let mut topo = Topology::new()
+        .expect("Failed to init topology");
 
     // Grab last core and exctract its CpuSet
     let mut cpuset = last_core(&mut topo).cpuset().unwrap();
